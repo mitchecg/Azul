@@ -1,7 +1,14 @@
+# external modules
 import pygame
-import rules as r
+import pygame_menu
 import math as m
 import random
+
+# local files
+import rules as r
+
+# classes
+
 
 class IoHandler:
 
@@ -20,7 +27,7 @@ class IoHandler:
         self.grid_size = 32
         self.pattern_width_tiles = max(r.rules["patternSizes"])
         self.board_width_tiles = min(r.rules["boardSize"], len(r.rules["colors"]))
-        #self.board_width = (self.pattern_width_tiles + self.board_width_tiles) * (self.tile_size + self.buffer) + self.buffer
+        # self.board_width = (self.pattern_width_tiles + self.board_width_tiles) * (self.tile_size + self.buffer) + self.buffer
         self.board_width = (self.pattern_width_tiles + self.board_width_tiles + 1) * self.grid_size
         if r.rules["floorSize"] is None:
             self.floor_size = len(r.rules["floor"]) + 1
@@ -32,7 +39,7 @@ class IoHandler:
         else:
             self.floor_height_tiles = 1
         self.text_space_height = 32
-        #self.board_height = (self.board_width_tiles + self.floor_height_tiles) * (self.tile_size + self.buffer) + self.buffer + self.text_space_height
+        # self.board_height = (self.board_width_tiles + self.floor_height_tiles) * (self.tile_size + self.buffer) + self.buffer + self.text_space_height
         self.board_height = (self.board_width_tiles + self.floor_height_tiles + 2) * self.grid_size
         self.board_x = [self.buffer, self.width - self.buffer - self.board_width, self.width - self.buffer - self.board_width, self.buffer]
         self.board_y = [self.buffer, self.buffer, self.height - self.buffer - self.board_height, self.height - self.buffer - self.board_height]
@@ -66,6 +73,7 @@ class IoHandler:
         self.font = pygame.font.Font(None, 30)
         self.floor_font = pygame.font.Font(None, 20)
         self.sprite_sheet = pygame.image.load("sprites.png")
+        self.current_controls = None
 
     def Create(self, related_object, i=None):
         if related_object.type == "board":
@@ -92,6 +100,9 @@ class IoHandler:
             return PlayerIO(self, related_object, i)
         elif related_object.type == "game":
             return GameIO(self, related_object)
+        elif related_object.type == "controls":
+            self.current_controls = ControlsIO(self, related_object)
+            return self.current_controls
 
     def CheckEvents(self, state):
         event = [None]
@@ -118,6 +129,8 @@ class IoHandler:
                             event.append(selected_pattern.related_object)
                         else:
                             event[0] = "unselect"
+        elif state == "in menu":
+            pass
         return event
 
     def get_sprite(self, sprite):
@@ -160,15 +173,19 @@ class IoHandler:
     def RemoveFromDisplay(self, i):
         self.objects[i] = None
 
-    def Display(self):
+    def Display(self, state=""):
         self.clock.tick(self.fps)
         self.window.blit(self.background, (0, 0))
-        self.active_player.draw(self.window)
-        for board in self.board_ios:
-            board.patterns.draw(self.window)
-        # self.patterns.draw(self.window)
-        self.tiles.draw(self.window)
-        self.tiles_selected.draw(self.window)
+        if state == "in menu":
+            pass
+            # self.current_controls.draw(self.background)
+        else:
+            self.active_player.draw(self.window)
+            for board in self.board_ios:
+                board.patterns.draw(self.window)
+            # self.patterns.draw(self.window)
+            self.tiles.draw(self.window)
+            self.tiles_selected.draw(self.window)
         pygame.display.flip()
 
 
@@ -501,8 +518,6 @@ class TileIO(pygame.sprite.Sprite):
         self.color_rgb = self.io_handler.tile_colors[self.color]
         self.height = self.io_handler.tile_size
         self.width = self.io_handler.tile_size
-        #self.image = pygame.Surface([self.width, self.height])
-        #self.image.fill(self.color_rgb)
         self.image = self.io_handler.get_sprite(self.color)
         self.io_container = self.related_object.container.io
         self.position = self.related_object.position
@@ -510,7 +525,6 @@ class TileIO(pygame.sprite.Sprite):
         self.x_target, self.y_target = self.x, self.y
         self.rect = self.image.get_rect(center=(self.x, self.y))
         self.speed = self.io_handler.tile_speed
-
 
     def update(self):
         self.position = self.related_object.position
@@ -586,6 +600,38 @@ class Pointer(pygame.sprite.Sprite):
         self.image = pygame.Surface([self.width, self.height])
         self.image.fill((255, 255, 255))
         self.rect = self.image.get_rect(center=(self.x, self.y))
+
+
+class ControlsIO(pygame_menu.Menu):
+    def __init__(self, io_handler, related_object):
+        self.io_handler = io_handler
+        self.related_object = related_object
+        pygame_menu.Menu.__init__(self, title="Main Menu", width=500, height=300, keyboard_enabled=False,
+                                  joystick_enabled=False, mouse_motion_selection=True)
+        self.system_menu = SystemMenuIO(self.io_handler, self)
+
+        if self.related_object.begun:
+            start_name = "Resume"
+        else:
+            start_name = "Play"
+        self.add.button(start_name, pygame_menu.events.CLOSE)
+        self.add.button("Players")
+        self.add.button("Rules")
+        self.add.button("System", system_menu.mainloop(self.io_handler.window, fps_limit=self.io_handler.fps,
+                                                       clear_surface=False, wait_for_event=True))
+        self.mainloop(self.io_handler.window, fps_limit=self.io_handler.fps, clear_surface=False, wait_for_event=True)
+
+
+class SystemMenuIO(pygame_menu.Menu):
+    def __int__(self, io_handler, parent_menu):
+        self.io_handler = io_handler
+        self.parent_menu = parent_menu
+        pygame_menu.Menu.__init__(self, title="System", width=500, height=300, keyboard_enabled=False,
+                                  joystick_enabled=False, mouse_motion_selection=True)
+        self.add.button("Save")
+        self.add.button("Load")
+        self.add.button("Quit", pygame_menu.events.EXIT)
+        self.mainloop(self.io_handler.window, fps_limit=self.io_handler.fps, clear_surface=False, wait_for_event=True)
 
 
 def polar_to_cart(r, angle=0, i=1, n=1):

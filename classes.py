@@ -826,6 +826,18 @@ class Game:
         return complete
 
 
+class Controls:
+
+    def __init__(self, io_handler, begun):
+        self.io_handler = io_handler
+        self.begun = begun
+        self.type = "controls"
+        self.io = io_handler.Create(self)
+
+    def Check(self):
+        self.io.Check()
+
+
 # Other functions
 def remove_value(the_list, val):
     return [value for value in the_list if value != val]
@@ -846,3 +858,4 @@ def keep_tiles(tiles, color):
 
 def remove_tiles(tiles, color):
     return list(filter(lambda tile: tile.color != color, tiles))
+
